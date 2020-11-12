@@ -1,7 +1,19 @@
-import * as React from "react";
-import { TableComponents } from "rc-table/es/interface";
-import { TableProps as RcTableProps } from 'rc-table/es/Table';
-export interface vt_opts<RecordType> {
+import React from "react";
+declare type CustomizeComponent = React.FC<any>;
+export interface TableComponents {
+    table?: CustomizeComponent;
+    header?: {
+        wrapper?: CustomizeComponent;
+        row?: CustomizeComponent;
+        cell?: CustomizeComponent;
+    };
+    body?: {
+        wrapper?: CustomizeComponent;
+        row?: CustomizeComponent;
+        cell?: CustomizeComponent;
+    };
+}
+export interface vt_opts {
     id?: number;
     /**
      * @default 5
@@ -10,7 +22,9 @@ export interface vt_opts<RecordType> {
     /**
      * this only needs the scroll.y
      */
-    scroll: RcTableProps<RecordType>['scroll'];
+    scroll?: {
+        y: number;
+    };
     /**
      * wheel event(only works on native events).
      */
@@ -24,6 +38,9 @@ export interface vt_opts<RecordType> {
      * @default false
      */
     debug?: boolean;
+    ref?: React.MutableRefObject<{
+        scrollTo: (y: number) => void;
+    }>;
 }
 /**
  * `INIT` -> `LOADED` -> `RUNNING`
@@ -33,15 +50,11 @@ declare enum e_VT_STATE {
     LOADED = 2,
     RUNNING = 4
 }
-interface RecordType extends Object {
-    [x: string]: any;
-}
-interface VT_CONTEXT<T = RecordType> extends vt_opts<T> {
+interface VT_CONTEXT extends vt_opts {
     _y: number;
     _raw_y: number | string;
-    _vtcomponents: TableComponents<RecordType>;
-    components: TableComponents<RecordType>;
-    computed_h: number;
+    _vtcomponents: TableComponents;
+    components: TableComponents;
     vt_state: e_VT_STATE;
     possible_hight_per_tr: number;
     re_computed: number;
@@ -57,13 +70,20 @@ interface VT_CONTEXT<T = RecordType> extends vt_opts<T> {
         left: number;
     };
     _React_ptr: any;
+    computed_h: number;
     WH: number;
     HND_PAINT: number;
     _offset_top: number;
     _offset_head: number;
     _offset_tail: number;
+    top: number;
+    left: number;
+    evt: number;
+    end: boolean;
+    final_top: number;
+    f_final_top: number;
+    update_count: number;
 }
-export declare function _set_components<T>(ctx: VT_CONTEXT<T>, components: TableComponents<T>): void;
-export declare function init<T>(): VT_CONTEXT<T>;
-export declare function vt_components<T>(ctx: VT_CONTEXT<T>, vt_opts: vt_opts<T>): TableComponents<T>;
+export declare function _set_components(ctx: VT_CONTEXT, components: TableComponents): void;
+export declare function init(fnOpts: () => vt_opts, deps: React.DependencyList): VT_CONTEXT;
 export {};

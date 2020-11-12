@@ -10,7 +10,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
 import { useRef, useMemo } from "react";
-import { vt_components, _set_components, init } from "./vt";
+import { _set_components, init } from "./vt";
 var _brower = 1;
 var _node = 2;
 
@@ -57,21 +57,13 @@ export function useOnce(factory) {
 
 function useVT(fnOpts) {
   var deps = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
-  var opts = useMemo(function () {
-    return Object.assign({
-      id: +new Date()
-    }, fnOpts());
-  }, deps);
-  var ctx = init();
+  var ctx = init(fnOpts, deps);
   var set = useOnce(function () {
     return function (components) {
       return _set_components(ctx, components);
     };
   });
-  var vt = useMemo(function () {
-    return vt_components(ctx, opts);
-  }, [opts]);
-  return [vt, set];
+  return [ctx._vtcomponents, set];
 }
 
 export { useVT };

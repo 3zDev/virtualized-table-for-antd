@@ -4,18 +4,6 @@ function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { va
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
-function _slicedToArray(arr, i) { return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _unsupportedIterableToArray(arr, i) || _nonIterableRest(); }
-
-function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
-
-function _unsupportedIterableToArray(o, minLen) { if (!o) return; if (typeof o === "string") return _arrayLikeToArray(o, minLen); var n = Object.prototype.toString.call(o).slice(8, -1); if (n === "Object" && o.constructor) n = o.constructor.name; if (n === "Map" || n === "Set") return Array.from(o); if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen); }
-
-function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len = arr.length; for (var i = 0, arr2 = new Array(len); i < len; i++) { arr2[i] = arr[i]; } return arr2; }
-
-function _iterableToArrayLimit(arr, i) { if (typeof Symbol === "undefined" || !(Symbol.iterator in Object(arr))) return; var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"] != null) _i["return"](); } finally { if (_d) throw _e; } } return _arr; }
-
-function _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }
-
 function _objectWithoutProperties(source, excluded) { if (source == null) return {}; var target = _objectWithoutPropertiesLoose(source, excluded); var key, i; if (Object.getOwnPropertySymbols) { var sourceSymbolKeys = Object.getOwnPropertySymbols(source); for (i = 0; i < sourceSymbolKeys.length; i++) { key = sourceSymbolKeys[i]; if (excluded.indexOf(key) >= 0) continue; if (!Object.prototype.propertyIsEnumerable.call(source, key)) continue; target[key] = source[key]; } } return target; }
 
 function _objectWithoutPropertiesLoose(source, excluded) { if (source == null) return {}; var target = {}; var sourceKeys = Object.keys(source); var key, i; for (i = 0; i < sourceKeys.length; i++) { key = sourceKeys[i]; if (excluded.indexOf(key) >= 0) continue; target[key] = source[key]; } return target; }
@@ -29,13 +17,19 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
-import * as React from "react";
-var useRef = React.useRef,
-    useState = React.useState,
-    useCallback = React.useCallback,
-    useContext = React.useContext,
-    useEffect = React.useEffect,
-    useMemo = React.useMemo;
+import React, { useRef, useState, useCallback, useContext, useEffect, useMemo, useImperativeHandle } from "react";
+/**
+ * THE EVENTS OF SCROLLING.
+ */
+
+var SCROLLEVT_NULL = 0 << 0;
+var SCROLLEVT_INIT = 1 << 0;
+var SCROLLEVT_RECOMPUTE = 1 << 1;
+var SCROLLEVT_NATIVE = 1 << 3;
+var SCROLLEVT_BY_HOOK = 1 << 6; // any events will be `SCROLLEVT_BY_HOOK` if the `ctx.f_top ===  TOP_CONTINUE`.
+
+var TOP_CONTINUE = 0;
+var TOP_DONE = 1;
 /**
  * `INIT` -> `LOADED` -> `RUNNING`
  */
@@ -60,7 +54,14 @@ function default_context() {
     _offset_top: 0 | 0,
     _offset_head: 0 | 0,
     _offset_tail: 0 | 1,
-    WH: 0
+    WH: 0,
+    top: 0,
+    left: 0,
+    evt: SCROLLEVT_NULL,
+    end: false,
+    final_top: 0,
+    f_final_top: TOP_DONE,
+    update_count: 0
   };
 }
 /* overload __DIAGNOSIS__. */
@@ -105,25 +106,17 @@ function log_debug(ctx, msg) {
     var ts = new Date().getTime();
     console.debug("%c[".concat(ctx.id, "][").concat(ts, "][").concat(msg, "] vt"), "color:#a00", ctx);
   }
-}
-/**
- * THE EVENTS OF SCROLLING.
- */
+} // the factory function returns a SimEvent.
 
 
-var SCROLLEVT_NULL = 0 << 0;
-var SCROLLEVT_INIT = 1 << 0;
-var SCROLLEVT_RECOMPUTE = 1 << 1;
-var SCROLLEVT_NATIVE = 1 << 3; // the factory function returns a SimEvent.
-
-function _make_evt(ne) {
+function make_evt(ne) {
   var target = ne.target;
   return {
     target: {
       scrollTop: target.scrollTop,
       scrollLeft: target.scrollLeft
     },
-    end: target.scrollHeight - target.clientHeight === target.scrollTop,
+    end: target.scrollHeight - target.clientHeight === Math.round(target.scrollTop),
     flag: SCROLLEVT_NATIVE
   };
 }
@@ -182,7 +175,20 @@ function scroll_with_offset(ctx, top, scroll_y) {
   console.assert(ctx._y >= 0); // to calc `_top` with `row_height` and `overscan`.
 
   var _top = 0,
-      i = 0;
+      i = 0,
+      j = 0; // the height to render.
+
+  var torender_h = 0; // scroll to the bottom of the table.
+
+  if (top === -1 && row_count > 0) {
+    i = row_count;
+
+    while (i > 0 && torender_h < ctx._y) {
+      torender_h += row_height[--i];
+    }
+
+    return [0 | i, 0 | row_count, 0 | ctx.computed_h - torender_h];
+  }
 
   for (; i < row_count && _top <= top; ++i) {
     _top += row_height[i] || default_h;
@@ -190,11 +196,9 @@ function scroll_with_offset(ctx, top, scroll_y) {
 
   while (i > 0 && overscan--) {
     _top -= row_height[--i];
-  } // the height to render.
+  }
 
-
-  var torender_h = 0,
-      j = i;
+  j = i;
 
   for (; j < row_count && torender_h < ctx._y; ++j) {
     torender_h += row_height[j] || default_h;
@@ -207,10 +211,17 @@ function scroll_with_offset(ctx, top, scroll_y) {
 } // set the variables for offset top/head/tail.
 
 
-function _set_offset(ctx, top, head, tail) {
+function set_offset(ctx, top, head, tail) {
   ctx._offset_top = 0 | top;
   ctx._offset_head = 0 | head;
   ctx._offset_tail = 0 | tail;
+}
+
+function set_scroll(ctx, top, left, evt, end) {
+  ctx.top = top;
+  ctx.left = left;
+  ctx.evt = evt;
+  ctx.end = end;
 }
 
 function update_wrap_style(ctx, h) {
@@ -276,12 +287,14 @@ function set_tr_cnt(ctx, n) {
   ctx.row_count = n;
 }
 
-function VTable(props) {
+function VTable(props, ref) {
   var style = props.style,
       context = props.context,
-      rest = _objectWithoutProperties(props, ["style", "context"]);
-  /*********** DOM ************/
+      rest = _objectWithoutProperties(props, ["style", "context"]); // force update this vt.
 
+
+  var force = useState(0);
+  /*********** DOM ************/
 
   var wrap_inst = useMemo(function () {
     return React.createRef();
@@ -297,24 +310,12 @@ function VTable(props) {
     }
 
     ctx.wrap_inst = wrap_inst;
+    ctx.top = ctx.initTop;
     helper_diagnosis(ctx);
-  }, []); // the state of scroll event
-
-  var _useState = useState({
-    top: ctx.initTop,
-    left: 0,
-    flag: SCROLLEVT_NULL,
-    end: false
-  }),
-      _useState2 = _slicedToArray(_useState, 2),
-      scroll = _useState2[0],
-      setScroll = _useState2[1];
+  }, []);
   /*********** scroll event ************/
 
-
   var event_queue = useRef([]).current;
-  var nevent_queue = useRef([]).current; // the Native EVENT.
-
   var HND_RAF = useRef(0); // handle of requestAnimationFrame
 
   /* eslint-disable prefer-const */
@@ -326,66 +327,72 @@ function VTable(props) {
     if (ctx.vt_state !== e_VT_STATE.RUNNING) return;
 
     if (e) {
-      if (e.flag) {
-        event_queue.push(e);
-      } else {
-        nevent_queue.push(e);
+      event_queue.push(e);
+
+      if (ctx.f_final_top === TOP_CONTINUE) {
+        e.flag = SCROLLEVT_BY_HOOK;
+        return RAF_update_self(0);
       }
     }
 
-    if (nevent_queue.length || event_queue.length) {
+    if (event_queue.length) {
       if (HND_RAF.current) cancelAnimationFrame(HND_RAF.current); // requestAnimationFrame, ie >= 10
 
       HND_RAF.current = requestAnimationFrame(RAF_update_self);
     }
   }, []);
+  var scroll_hook_native = useCallback(function (e) {
+    scroll_hook(make_evt(e));
+  }, []);
   /* requestAnimationFrame callback */
 
   RAF_update_self = useCallback(function (timestamp) {
     if (ctx.vt_state !== e_VT_STATE.RUNNING) return;
-    var nevq = nevent_queue,
-        evq = event_queue;
+    var evq = event_queue;
     var e; // consume the `evq` first.
 
     if (evq.length) {
       e = evq.shift();
-    } else if (nevq.length) {
-      // take the last event from the `nevq`.
-      e = _make_evt(nevq.pop());
-      nevq.length = 0;
     } else {
       return;
     }
 
-    var scrollTop = e.target.scrollTop;
-    var scrollLeft = e.target.scrollLeft;
+    var etop = e.target.scrollTop;
+    var eleft = e.target.scrollLeft;
     var flag = e.flag;
 
     if (ctx.debug) {
-      console.debug("[".concat(ctx.id, "][SCROLL] top: %d, left: %d"), scrollTop, scrollLeft);
+      console.debug("[".concat(ctx.id, "][SCROLL] top: %d, left: %d"), etop, eleft);
     } // checks every tr's height, which will take some time...
 
 
-    var offset = scroll_with_offset(ctx, scrollTop, ctx.scroll.y);
+    var offset = scroll_with_offset(ctx, ctx.f_final_top === TOP_CONTINUE ? ctx.final_top : etop, ctx.scroll.y);
     var head = offset[0];
     var tail = offset[1];
     var top = offset[2];
     var prev_head = ctx._offset_head;
     var prev_tail = ctx._offset_tail;
     var prev_top = ctx._offset_top;
+    var end;
 
     switch (flag) {
       case SCROLLEVT_INIT:
         log_debug(ctx, "SCROLLEVT_INIT");
+        end = false;
+        break;
 
-        _set_offset(ctx, top, head, tail);
+      case SCROLLEVT_BY_HOOK:
+        log_debug(ctx, "SCROLLEVT_BY_HOOK");
 
-        setScroll({
-          top: scrollTop,
-          left: scrollLeft,
-          flag: SCROLLEVT_INIT,
-          end: false
-        });
+        if (head === prev_head && tail === prev_tail && top === prev_top) {
+          ctx.f_final_top = TOP_DONE;
+          if (ctx.final_top === -1) etop = ctx.computed_h - ctx._y;
+          end = true;
+        } else {
+          if (ctx.final_top === -1) etop = top;
+          end = false;
+        }
+
         break;
 
       case SCROLLEVT_RECOMPUTE:
@@ -398,14 +405,7 @@ function VTable(props) {
           return;
         }
 
-        _set_offset(ctx, top, head, tail);
-
-        setScroll({
-          top: scrollTop,
-          left: scrollLeft,
-          flag: SCROLLEVT_RECOMPUTE,
-          end: false
-        });
+        end = false;
         break;
 
       case SCROLLEVT_NATIVE:
@@ -414,8 +414,8 @@ function VTable(props) {
 
         if (ctx.onScroll) {
           ctx.onScroll({
-            top: scrollTop,
-            left: scrollLeft,
+            top: etop,
+            left: eleft,
             isEnd: e.end
           });
         }
@@ -424,35 +424,51 @@ function VTable(props) {
           return;
         }
 
-        _set_offset(ctx, top, head, tail);
-
-        setScroll({
-          top: scrollTop,
-          left: scrollLeft,
-          flag: SCROLLEVT_NATIVE,
-          end: e.end
-        });
+        end = e.end;
         break;
     }
+
+    set_offset(ctx, top, head, tail);
+    set_scroll(ctx, etop, eleft, flag, end);
+    force[1](++ctx.update_count);
+  }, []); // expose to the parent components you are using.
+
+  useImperativeHandle(ref, function () {
+    return {
+      // `y === -1` indicates you need to scroll to the bottom of the table.
+      scrollTo: function scrollTo(y) {
+        ctx.f_final_top = TOP_CONTINUE;
+        ctx.final_top = y;
+        scroll_hook({
+          target: {
+            scrollTop: y,
+            scrollLeft: -1
+          },
+          flag: SCROLLEVT_BY_HOOK
+        });
+      }
+    };
   }, []);
   useEffect(function () {
-    ctx.wrap_inst.current.parentElement.onscroll = scroll_hook;
+    ctx.wrap_inst.current.parentElement.onscroll = scroll_hook_native;
   }, [wrap_inst]); // update DOM style.
 
   useEffect(function () {
-    switch (scroll.flag) {
+    switch (ctx.evt) {
+      case SCROLLEVT_BY_HOOK:
+        scroll_to(ctx, ctx.top, ctx.left);
+        break;
+
       case SCROLLEVT_INIT:
       case SCROLLEVT_RECOMPUTE:
-        scroll_to(ctx, scroll.top, scroll.left);
-        HND_RAF.current = 0;
-        if (event_queue.length) scroll_hook(null); // consume the next.
+        scroll_to(ctx, ctx.top, ctx.left);
+        if (event_queue.length) RAF_update_self(0); // consume the next.
 
-        break;
-
-      default:
         break;
     }
-  }, [scroll]);
+  }, [force[0]
+  /* for performance. */
+  ]);
   useEffect(function () {
     switch (ctx.vt_state) {
       case e_VT_STATE.INIT:
@@ -465,7 +481,7 @@ function VTable(props) {
 
         scroll_hook({
           target: {
-            scrollTop: scroll.top,
+            scrollTop: ctx.top,
             scrollLeft: 0
           },
           flag: SCROLLEVT_INIT
@@ -478,8 +494,8 @@ function VTable(props) {
           ctx.re_computed = 0;
           scroll_hook({
             target: {
-              scrollTop: scroll.top,
-              scrollLeft: scroll.left
+              scrollTop: ctx.top,
+              scrollLeft: ctx.left
             },
             flag: SCROLLEVT_RECOMPUTE
           });
@@ -513,12 +529,12 @@ function VTable(props) {
 }
 
 function VWrapper(props) {
-  var _props$children = _slicedToArray(props.children, 2),
-      measureRow = _props$children[0],
-      rows = _props$children[1],
+  var c = props.children,
       ctx = props.ctx,
       restProps = _objectWithoutProperties(props, ["children", "ctx"]);
 
+  var measureRow = c[0];
+  var rows = c[1];
   var Wrapper = ctx.components.body.wrapper;
 
   if (!Array.isArray(rows)) {
@@ -555,7 +571,7 @@ function VWrapper(props) {
           if (head < 0) head = 0;
           if (tail < 0) tail = 0; // update the `head` and `tail`.
 
-          _set_offset(ctx, ctx._offset_top
+          set_offset(ctx, ctx._offset_top
           /* NOTE: invalided param, just to fill for this param */
           , head, tail);
         }
@@ -665,35 +681,44 @@ export function _set_components(ctx, components) {
     ctx.components.table = table;
   }
 }
-export function init() {
+export function init(fnOpts, deps) {
   var ctx = useRef(React.createContext({})).current;
   var ctx_value = useContext(ctx);
-  var VTableC = useCallback(function (props) {
-    return React.createElement(VTable, Object.assign({}, props, {
-      context: ctx
-    }));
-  }, []);
-  var VWrapperC = useCallback(function (props) {
-    return React.createElement(ctx.Consumer, null, function ()
-    /* value */
-    {
-      return React.createElement(VWrapper, Object.assign({}, props, {
-        ctx: ctx_value
-      }));
-    });
-  }, []);
-  var VRowC = useCallback(function (props) {
-    return React.createElement(VTRow, Object.assign({}, props, {
-      context: ctx_value
-    }));
-  }, []);
+  var default_ref = useRef();
   useMemo(function () {
-    // set the virtual layer.
+    return Object.assign(ctx_value, {
+      id: +new Date(),
+      initTop: 0,
+      overscanRowCount: 5,
+      debug: false,
+      ref: default_ref
+    }, fnOpts());
+  }, deps);
+  useMemo(function () {
+    var VTable2 = React.forwardRef(VTable); // set the virtual layer.
+
     ctx_value._vtcomponents = {
-      table: VTableC,
+      table: function table(props) {
+        return React.createElement(VTable2, Object.assign({}, props, {
+          context: ctx,
+          ref: ctx_value.ref
+        }));
+      },
       body: {
-        wrapper: VWrapperC,
-        row: VRowC
+        wrapper: function wrapper(props) {
+          return React.createElement(ctx.Consumer, null, function ()
+          /* value */
+          {
+            return React.createElement(VWrapper, Object.assign({}, props, {
+              ctx: ctx_value
+            }));
+          });
+        },
+        row: function row(props) {
+          return React.createElement(VTRow, Object.assign({}, props, {
+            context: ctx_value
+          }));
+        }
       }
     }; // set the default implementation layer.
 
@@ -711,17 +736,4 @@ export function init() {
     ctx_value.vt_state = e_VT_STATE.INIT;
   }, []);
   return ctx_value;
-}
-export function vt_components(ctx, vt_opts) {
-  Object.assign(ctx, {
-    initTop: 0,
-    overscanRowCount: 5,
-    debug: false
-  }, vt_opts);
-
-  if (vt_opts.debug) {
-    console.debug("[".concat(vt_opts.id, "] calling VTComponents with"), vt_opts);
-  }
-
-  return ctx._vtcomponents;
 }

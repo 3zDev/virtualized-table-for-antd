@@ -1,6 +1,5 @@
 /// <reference types="react" />
-import { TableComponents } from "rc-table/es/interface";
-import { vt_opts } from "./vt";
+import { TableComponents, vt_opts } from "./vt";
 export declare function useOnce<T, U>(factory: (...args: U[]) => T, ...args: U[]): T;
 /**
  * @example
@@ -24,5 +23,5 @@ export declare function useOnce<T, U>(factory: (...args: U[]) => T, ...args: U[]
  * );
  * }
  */
-declare function useVT<RecordType>(fnOpts: () => vt_opts<RecordType>, deps?: React.DependencyList): [TableComponents<RecordType>, (components: TableComponents<RecordType>) => void];
+declare function useVT(fnOpts: () => vt_opts, deps?: React.DependencyList): [TableComponents, (components: TableComponents) => void];
 export { useVT };
