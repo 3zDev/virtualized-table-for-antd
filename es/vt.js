@@ -227,8 +227,8 @@ function set_scroll(ctx, top, left, evt, end) {
 function update_wrap_style(ctx, h) {
   if (ctx.WH === h) return;
   ctx.WH = h;
-  ctx.wrap_inst.current.style.height = "".concat(h, "px");
-  ctx.wrap_inst.current.style.maxHeight = "".concat(h, "px");
+  var s = ctx.wrap_inst.current.style;
+  s.height = h ? (s.maxHeight = h + 'px', s.maxHeight) : (s.maxHeight = 'unset', s.maxHeight);
 } // scrolls the parent element to specified location.
 
 
@@ -271,6 +271,11 @@ function srs_expand(ctx, len, prev_len, fill_value) {
 }
 
 function srs_shrink(ctx, len, prev_len) {
+  if (len === 0) {
+    ctx.computed_h = 0;
+    return;
+  }
+
   var rows = ctx.row_height;
   var h2shrink = 0;
 
@@ -535,18 +540,11 @@ function VWrapper(props) {
 
   var measureRow = c[0];
   var rows = c[1];
-  var Wrapper = ctx.components.body.wrapper;
+  var Wrapper = ctx.components.body.wrapper; // reference https://github.com/react-component/table/blob/master/src/Body/index.tsx#L6
 
-  if (!Array.isArray(rows)) {
-    // reference https://github.com/react-component/table/blob/master/src/Body/index.tsx#L66
-    // emptyNode if these rows are not array.
-    return React.createElement(Wrapper, Object.assign({}, restProps), measureRow, rows);
-  }
-
+  var len = Array.isArray(rows) ? rows.length : 0;
   var head = ctx._offset_head,
       tail = ctx._offset_tail;
-  var children = rows;
-  var len = children.length;
   var trs;
 
   switch (ctx.vt_state) {
@@ -554,7 +552,7 @@ function VWrapper(props) {
       if (len >= 0) {
         console.assert(head === 0);
         console.assert(tail === 1);
-        trs = children.slice(head, tail);
+        trs = Array.isArray(rows) ? rows.slice(head, tail) : rows;
         ctx.re_computed = len;
         ctx.prev_row_count = len;
         ctx.row_count = len;
@@ -587,19 +585,18 @@ function VWrapper(props) {
         if (len < prev_len) {
           srs_shrink(ctx, len, prev_len);
         } else if (len > prev_len) {
-          var _rows = ctx.row_height;
+          var row_h = ctx.row_height;
 
-          if (len - _rows.length > 0) {
-            srs_expand(ctx, len, _rows.length, ctx.possible_hight_per_tr);
+          if (len - row_h.length > 0) {
+            srs_expand(ctx, len, row_h.length, ctx.possible_hight_per_tr);
           } else {
             // calculate the total height quickly.
-            _rows.fill(ctx.possible_hight_per_tr, prev_len, len);
-
+            row_h.fill(ctx.possible_hight_per_tr, prev_len, len);
             ctx.computed_h += ctx.possible_hight_per_tr * (len - prev_len);
           }
         }
 
-        trs = children.slice(head, tail);
+        trs = len ? rows.slice(head, tail) : rows;
         ctx.prev_row_count = ctx.row_count;
       }
       break;
