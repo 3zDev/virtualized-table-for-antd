@@ -145,6 +145,8 @@ interface VT_CONTEXT extends vt_opts {
   f_final_top: number;
 
   update_count: number;
+
+  tableHeight: number;  // add tableHeight
 }
 
 
@@ -168,6 +170,7 @@ function default_context(): VT_CONTEXT {
     final_top: 0,
     f_final_top: TOP_DONE,
     update_count: 0,
+    tableHeight: 0,  // add tableHeight
   } as VT_CONTEXT;
 }
 
@@ -361,7 +364,7 @@ function _repainting(ctx: VT_CONTEXT, ms: number): number {
 
     if (ctx.vt_state === e_VT_STATE.RUNNING && ctx.wrap_inst.current) {
       // output to the buffer
-      update_wrap_style(ctx, ctx.computed_h);
+      update_wrap_style(ctx, ctx.tableHeight);  // change ctx.computed_h to ctx.tableHeight
     }
 
     // free this handle manually.

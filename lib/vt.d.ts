@@ -83,6 +83,7 @@ interface VT_CONTEXT extends vt_opts {
     final_top: number;
     f_final_top: number;
     update_count: number;
+    tableHeight: number;
 }
 export declare function _set_components(ctx: VT_CONTEXT, components: TableComponents): void;
 export declare function init(fnOpts: () => vt_opts, deps: React.DependencyList): VT_CONTEXT;
